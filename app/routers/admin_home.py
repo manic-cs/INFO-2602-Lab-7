@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
-from fastapi.responses import HTMLResponse
-from sqlalchemy import select, or_, func
+from fastapi.responses import HTMLResponse, RedirectResponse
+from sqlalchemy import select, or_
 from app.dependencies.session import SessionDep
 from app.dependencies.auth import AdminDep
 from app.models.user import User, Todo
@@ -12,7 +12,7 @@ async def admin_home_view(
     request: Request,
     user: AdminDep,
     db: SessionDep,
-    q: str = "",
+    q: Optional[str] = None,
     done: str = "any",
     page: int = 1,
     limit: int = 10
@@ -32,13 +32,12 @@ async def admin_home_view(
     elif done == "false":
         stmt = stmt.where(Todo.done == False)
 
-    total_stmt = select(func.count()).select_from(stmt.subquery())
-    total = db.scalar(total_stmt)
-    
+    results = db.exec(stmt).all()
+    total = len(results)
     pagination = Pagination(total, page, limit)
 
     stmt = stmt.offset(pagination.offset).limit(pagination.limit)
-    todos = db.scalars(stmt).all()
+    todos = db.exec(stmt).all()
 
     return templates.TemplateResponse(
         request=request, 
